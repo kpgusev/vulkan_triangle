@@ -274,8 +274,48 @@ int main(int argc, char **argv) {
 
   auto imagesInFlight = std::vector<vk::Fence>(swapchainImages.size(), nullptr);
 
+  auto graphicsQueue = device->getQueue(0, 0);
+  auto presentQueue = device->getQueue(0, 0);
+
+  auto currentFrame = static_cast<size_t>(0);
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
+    device->waitForFences({*inFlightFences[currentFrame]}, vk::True,
+                          std::numeric_limits<uint64_t>::max());
+
+    uint32_t imageIndex =
+        device
+            ->acquireNextImageKHR(
+                *swapchain, std::numeric_limits<uint64_t>::max(),
+                *imageAvailableSemaphores[currentFrame], nullptr)
+            .value;
+
+    if (imagesInFlight[imageIndex] != nullptr) {
+      device->waitForFences({imagesInFlight[imageIndex]}, vk::True,
+                            std::numeric_limits<uint64_t>::max());
+    }
+    imagesInFlight[imageIndex] = *inFlightFences[currentFrame];
+
+    device->resetFences({*inFlightFences[currentFrame]});
+
+    vk::Semaphore waitSemaphores[] = {*imageAvailableSemaphores[currentFrame]};
+    vk::PipelineStageFlags waitStages[] = {
+        vk::PipelineStageFlagBits::eColorAttachmentOutput};
+
+    auto submitInfo = vk::SubmitInfo{1,
+                                     waitSemaphores,
+                                     waitStages,
+                                     1,
+                                     &(*commandBuffers[imageIndex]),
+                                     1,
+                                     &(*renderFinishedSemaphores[imageIndex])};
+    graphicsQueue.submit({submitInfo}, *inFlightFences[currentFrame]);
+
+    vk::SwapchainKHR swapchains[] = {*swapchain};
+    presentQueue.presentKHR({1, &(*renderFinishedSemaphores[imageIndex]), 1,
+                             swapchains, &imageIndex});
+
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
   }
 
   device->waitIdle();
