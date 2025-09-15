@@ -25,8 +25,8 @@ int main(int argc, char **argv) {
                     instanceExtensions + instanceExtensionCount);
 
   // TODO: verify required extensions and layers
-  // (`enumerateInstanceExtensionProperties` and
-  // `enumerateInstanceLayerProperties`)
+  // (`vk::enumerateInstanceExtensionProperties` and
+  // `vk::enumerateInstanceLayerProperties`)
 
   auto applicationInfo =
       vk::ApplicationInfo{"", 0, "", 0, vk::enumerateInstanceVersion()};
