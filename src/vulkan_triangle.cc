@@ -216,6 +216,20 @@ int main(int argc, char **argv) {
                                     0})
                       .value;
 
+  auto framebuffers =
+      std::vector<vk::UniqueFramebuffer>(swapchainImageViews.size());
+  for (size_t i = 0; i < swapchainImageViews.size(); ++i) {
+    vk::ImageView attachments[] = {*swapchainImageViews[i]};
+    auto framebufferInfo = vk::FramebufferCreateInfo{{},
+                                                     *renderPass,
+                                                     1,
+                                                     attachments,
+                                                     swapchainExtent.width,
+                                                     swapchainExtent.height,
+                                                     1};
+    framebuffers[i] = device->createFramebufferUnique(framebufferInfo);
+  }
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
