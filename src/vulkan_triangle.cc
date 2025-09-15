@@ -247,7 +247,8 @@ int main(int argc, char **argv) {
                                 {{0, 0}, swapchainExtent},
                                 1,
                                 &clearColor};
-    commandBuffer->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    commandBuffer->beginRenderPass(renderPassBeginInfo,
+                                   vk::SubpassContents::eInline);
     commandBuffer->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
     commandBuffer->draw(3, 1, 0, 0);
     commandBuffer->endRenderPass();
