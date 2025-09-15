@@ -67,6 +67,26 @@ int main(int argc, char **argv) {
        deviceExtensions.data(),
        nullptr});
 
+  auto queueFamilyIndices = std::vector<uint32_t>{0};
+  auto swapchain = device->createSwapchainKHRUnique(
+      {{},
+       *surface,
+       4, // TODO: smart set
+       vk::Format::eB8G8R8A8Unorm,        // TODO: find best
+       vk::ColorSpaceKHR::eSrgbNonlinear, // TODO: find best
+       physicalDevice.getSurfaceCapabilitiesKHR(*surface)
+           .currentExtent, // TODO: smart get
+       1,
+       vk::ImageUsageFlagBits::eColorAttachment,
+       vk::SharingMode::eExclusive, // TODO: smart set
+       static_cast<uint32_t>(queueFamilyIndices.size()),
+       queueFamilyIndices.data(),
+       physicalDevice.getSurfaceCapabilitiesKHR(*surface).currentTransform,
+       vk::CompositeAlphaFlagBitsKHR::eOpaque,
+       vk::PresentModeKHR::eMailbox, // TODO: find best
+       vk::True,
+       nullptr});
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
