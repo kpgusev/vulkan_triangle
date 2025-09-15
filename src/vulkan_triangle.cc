@@ -47,6 +47,9 @@ int main(int argc, char **argv) {
       vk::detail::ObjectDestroy<vk::Instance, vk::detail::DispatchLoaderStatic>{
           *instance}};
 
+  auto physicalDevice =
+      instance->enumeratePhysicalDevices().front(); // TODO: check is suitable
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
