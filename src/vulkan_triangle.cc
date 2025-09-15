@@ -6,7 +6,7 @@
 #include <toml.hpp>
 #include <vulkan/vulkan.hpp>
 
-static std::vector<char> readBinaryFile(const std::filesystem::path& filepath) {
+static std::vector<char> readBinaryFile(const std::filesystem::path &filepath) {
   std::ifstream file(filepath, std::ios::binary);
   const auto fileSize = std::filesystem::file_size(filepath);
   std::vector<char> buffer(fileSize);
@@ -129,6 +129,26 @@ int main(int argc, char **argv) {
                              1,  &colorAttachmentReference};
   auto renderPass =
       device->createRenderPassUnique({{}, 1, &colorAttachment, 1, &subpass});
+
+  auto vertexShaderCode = readBinaryFile("shaders/main.vert.spv");
+  auto vertexShaderModule = device->createShaderModuleUnique(
+      {{},
+       vertexShaderCode.size(),
+       reinterpret_cast<const uint32_t *>(vertexShaderCode.data())});
+
+  auto fragmentShaderCode = readBinaryFile("shaders/main.frag.spv");
+  auto fragmentShaderModule = device->createShaderModuleUnique(
+      {{},
+       fragmentShaderCode.size(),
+       reinterpret_cast<const uint32_t *>(fragmentShaderCode.data())});
+
+  auto shaderStages = std::array{
+      vk::PipelineShaderStageCreateInfo{
+          {}, vk::ShaderStageFlagBits::eVertex, *vertexShaderModule, "main"},
+      vk::PipelineShaderStageCreateInfo{{},
+                                        vk::ShaderStageFlagBits::eFragment,
+                                        *fragmentShaderModule,
+                                        "main"}};
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
