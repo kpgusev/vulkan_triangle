@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
 
   // TODO: set `GLFW_RESIZABLE`, `GLFW_DECORATED`, etc.
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  GLFWwindow *window =
+  auto window =
       glfwCreateWindow(512, 512, "", nullptr, nullptr); // TODO: RAII-wrap
 
   while (!glfwWindowShouldClose(window)) {
