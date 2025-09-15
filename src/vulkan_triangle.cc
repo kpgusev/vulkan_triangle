@@ -90,6 +90,19 @@ int main(int argc, char **argv) {
        vk::True,
        nullptr});
 
+  auto swapchainImages = device->getSwapchainImagesKHR(*swapchain);
+  auto swapchainImageViews =
+      std::vector<vk::UniqueImageView>(swapchainImages.size());
+  for (size_t i = 0; i < swapchainImages.size(); ++i) {
+    swapchainImageViews[i] = device->createImageViewUnique(
+        {{},
+         swapchainImages[i],
+         vk::ImageViewType::e2D,
+         surfaceFormat.format,
+         {},
+         {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
+  }
+
   auto colorAttachment =
       vk::AttachmentDescription{{},
                                 surfaceFormat.format,
