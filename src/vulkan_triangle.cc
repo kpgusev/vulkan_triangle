@@ -67,13 +67,16 @@ int main(int argc, char **argv) {
        deviceExtensions.data(),
        nullptr});
 
+  auto surfaceFormat = vk::SurfaceFormatKHR{// TODO: find best
+                                            vk::Format::eB8G8R8A8Unorm,
+                                            vk::ColorSpaceKHR::eSrgbNonlinear};
   auto queueFamilyIndices = std::vector<uint32_t>{0};
   auto swapchain = device->createSwapchainKHRUnique(
       {{},
        *surface,
        4, // TODO: smart set
-       vk::Format::eB8G8R8A8Unorm,        // TODO: find best
-       vk::ColorSpaceKHR::eSrgbNonlinear, // TODO: find best
+       surfaceFormat.format,
+       surfaceFormat.colorSpace,
        physicalDevice.getSurfaceCapabilitiesKHR(*surface)
            .currentExtent, // TODO: smart get
        1,
