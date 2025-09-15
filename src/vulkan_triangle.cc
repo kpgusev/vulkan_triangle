@@ -50,6 +50,23 @@ int main(int argc, char **argv) {
   auto physicalDevice =
       instance->enumeratePhysicalDevices().front(); // TODO: check is suitable
 
+  auto queuePriority = 1.0f;
+  auto deviceQueueCreateInfos = std::vector{vk::DeviceQueueCreateInfo{
+      {},
+      0, // TODO: `std::set` of  unique queue families indices
+      1,
+      &queuePriority}};
+  auto deviceExtensions = std::vector{vk::KHRSwapchainExtensionName};
+  auto device = physicalDevice.createDeviceUnique(
+      {{},
+       static_cast<uint32_t>(deviceQueueCreateInfos.size()),
+       deviceQueueCreateInfos.data(),
+       0,
+       nullptr,
+       static_cast<uint32_t>(deviceExtensions.size()),
+       deviceExtensions.data(),
+       nullptr});
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
