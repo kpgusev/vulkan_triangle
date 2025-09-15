@@ -255,9 +255,30 @@ int main(int argc, char **argv) {
     commandBuffer->end();
   }
 
+  auto MAX_FRAMES_IN_FLIGHT = 2;
+
+  auto imageAvailableSemaphores =
+      std::vector<vk::UniqueSemaphore>(MAX_FRAMES_IN_FLIGHT);
+  auto inFlightFences = std::vector<vk::UniqueFence>(MAX_FRAMES_IN_FLIGHT);
+  for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+    imageAvailableSemaphores[i] = device->createSemaphoreUnique({});
+    inFlightFences[i] =
+        device->createFenceUnique({vk::FenceCreateFlagBits::eSignaled});
+  }
+
+  auto renderFinishedSemaphores =
+      std::vector<vk::UniqueSemaphore>(swapchainImages.size());
+  for (size_t i = 0; i < swapchainImages.size(); ++i) {
+    renderFinishedSemaphores[i] = device->createSemaphoreUnique({});
+  }
+
+  auto imagesInFlight = std::vector<vk::Fence>(swapchainImages.size(), nullptr);
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
+
+  device->waitIdle();
 
   glfwDestroyWindow(window); // TODO: RAII-wrap
   glfwTerminate();           // TODO: RAII-wrap
