@@ -39,6 +39,14 @@ int main(int argc, char **argv) {
                                 static_cast<uint32_t>(extensions.size()),
                                 extensions.data()});
 
+  VkSurfaceKHR rawSurface;
+  glfwCreateWindowSurface(*instance, window, nullptr,
+                          &rawSurface); // TODO: check `vk::Result::eSuccess`
+  auto surface = vk::UniqueSurfaceKHR{
+      rawSurface,
+      vk::detail::ObjectDestroy<vk::Instance, vk::detail::DispatchLoaderStatic>{
+          *instance}};
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
