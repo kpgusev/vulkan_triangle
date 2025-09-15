@@ -230,6 +230,30 @@ int main(int argc, char **argv) {
     framebuffers[i] = device->createFramebufferUnique(framebufferInfo);
   }
 
+  auto commandPool = device->createCommandPoolUnique(
+      {vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+       0}); // TODO: smart queue family index
+  auto commandBuffers = device->allocateCommandBuffersUnique(
+      {*commandPool, vk::CommandBufferLevel::ePrimary,
+       static_cast<uint32_t>(framebuffers.size())});
+
+  for (size_t i = 0; i < commandBuffers.size(); ++i) {
+    auto &commandBuffer = commandBuffers[i];
+    commandBuffer->begin({vk::CommandBufferUsageFlagBits::eSimultaneousUse});
+    vk::ClearValue clearColor{std::array{0.0f, 0.0f, 0.0f, 1.0f}};
+    auto renderPassBeginInfo =
+        vk::RenderPassBeginInfo{*renderPass,
+                                *framebuffers[i],
+                                {{0, 0}, swapchainExtent},
+                                1,
+                                &clearColor};
+    commandBuffer->beginRenderPass(renderPassBeginInfo, vk::SubpassContents::eInline);
+    commandBuffer->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
+    commandBuffer->draw(3, 1, 0, 0);
+    commandBuffer->endRenderPass();
+    commandBuffer->end();
+  }
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
