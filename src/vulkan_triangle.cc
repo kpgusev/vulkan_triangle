@@ -150,6 +150,72 @@ int main(int argc, char **argv) {
                                         *fragmentShaderModule,
                                         "main"}};
 
+  auto pipelineVertexInputStateCreateInfo =
+      vk::PipelineVertexInputStateCreateInfo{};
+  auto pipelineInputAssemblyStateCreateInfo =
+      vk::PipelineInputAssemblyStateCreateInfo{
+          {}, vk::PrimitiveTopology::eTriangleList, vk::False};
+  auto viewport = vk::Viewport{
+      0.0f,
+      0.0f,
+      static_cast<float>(physicalDevice.getSurfaceCapabilitiesKHR(*surface)
+                             .currentExtent.width),
+      static_cast<float>(physicalDevice.getSurfaceCapabilitiesKHR(*surface)
+                             .currentExtent.height),
+      0.0f,
+      1.0f};
+  auto scissor = vk::Rect2D{
+      {0, 0}, physicalDevice.getSurfaceCapabilitiesKHR(*surface).currentExtent};
+  auto pipelineViewportStateCreateInfo =
+      vk::PipelineViewportStateCreateInfo{{}, 1, &viewport, 1, &scissor};
+  auto rasterizer =
+      vk::PipelineRasterizationStateCreateInfo{{},
+                                               vk::False,
+                                               vk::False,
+                                               vk::PolygonMode::eFill,
+                                               vk::CullModeFlagBits::eBack,
+                                               vk::FrontFace::eClockwise,
+                                               vk::False,
+                                               {},
+                                               {},
+                                               {},
+                                               1.0f};
+  auto multisampling = vk::PipelineMultisampleStateCreateInfo{
+      {}, vk::SampleCountFlagBits::e1, vk::False};
+  auto pipelineColorBlendAttachmentState =
+      vk::PipelineColorBlendAttachmentState{
+          vk::False,
+          {},
+          {},
+          {},
+          {},
+          {},
+          {},
+          vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+              vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA};
+  auto pipelineColorBlendStateCreateInfo =
+      vk::PipelineColorBlendStateCreateInfo{{},
+                                            vk::False,
+                                            vk::LogicOp::eCopy,
+                                            1,
+                                            &pipelineColorBlendAttachmentState};
+  auto pipelineLayout = device->createPipelineLayoutUnique({});
+  auto pipeline =
+    device->createGraphicsPipelineUnique(nullptr, {{},
+                                                   shaderStages,
+                                                   &pipelineVertexInputStateCreateInfo,
+                                                   &pipelineInputAssemblyStateCreateInfo,
+                                                   nullptr,
+                                                   &pipelineViewportStateCreateInfo,
+                                                   &rasterizer,
+                                                   &multisampling,
+                                                   nullptr,
+                                                   &pipelineColorBlendStateCreateInfo,
+                                                   nullptr,
+                                                   *pipelineLayout,
+                                                   *renderPass,
+                                                   0}).value;
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
