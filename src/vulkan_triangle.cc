@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
   auto surfaceFormat = vk::SurfaceFormatKHR{// TODO: find best
                                             vk::Format::eB8G8R8A8Unorm,
                                             vk::ColorSpaceKHR::eSrgbNonlinear};
-  auto queueFamilyIndices = std::vector<uint32_t>{0};
+  auto queueFamilyIndices = std::vector<uint32_t>{0}; // TODO: smart find
   auto swapchain = device->createSwapchainKHRUnique(
       {{},
        *surface,
@@ -130,6 +130,7 @@ int main(int argc, char **argv) {
   auto renderPass =
       device->createRenderPassUnique({{}, 1, &colorAttachment, 1, &subpass});
 
+  // TODO: per-module load
   auto vertexShaderCode = readBinaryFile("shaders/main.vert.spv");
   auto vertexShaderModule = device->createShaderModuleUnique(
       {{},
@@ -168,7 +169,7 @@ int main(int argc, char **argv) {
       {0, 0}, physicalDevice.getSurfaceCapabilitiesKHR(*surface).currentExtent};
   auto pipelineViewportStateCreateInfo =
       vk::PipelineViewportStateCreateInfo{{}, 1, &viewport, 1, &scissor};
-  auto rasterizer =
+  auto rasterizer = // TODO: config
       vk::PipelineRasterizationStateCreateInfo{{},
                                                vk::False,
                                                vk::False,
