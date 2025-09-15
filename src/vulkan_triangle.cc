@@ -90,6 +90,25 @@ int main(int argc, char **argv) {
        vk::True,
        nullptr});
 
+  auto colorAttachment =
+      vk::AttachmentDescription{{},
+                                surfaceFormat.format,
+                                vk::SampleCountFlagBits::e1,
+                                vk::AttachmentLoadOp::eClear,
+                                vk::AttachmentStoreOp::eStore,
+                                vk::AttachmentLoadOp::eDontCare,
+                                vk::AttachmentStoreOp::eDontCare,
+                                vk::ImageLayout::eUndefined,
+                                vk::ImageLayout::ePresentSrcKHR};
+  auto colorAttachmentReference =
+      vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal};
+
+  auto subpass =
+      vk::SubpassDescription{{}, vk::PipelineBindPoint::eGraphics, 0, nullptr,
+                             1,  &colorAttachmentReference};
+  auto renderPass =
+      device->createRenderPassUnique({{}, 1, &colorAttachment, 1, &subpass});
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
