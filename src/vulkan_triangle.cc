@@ -14,6 +14,31 @@ int main(int argc, char **argv) {
   auto window =
       glfwCreateWindow(512, 512, "", nullptr, nullptr); // TODO: RAII-wrap
 
+  // TODO: `NDEBUG` check
+  std::vector layers{"VK_LAYER_KHRONOS_validation"};
+  std::vector extensions{vk::EXTDebugUtilsExtensionName};
+
+  uint32_t instanceExtensionCount = 0;
+  const char **instanceExtensions =
+      glfwGetRequiredInstanceExtensions(&instanceExtensionCount);
+  extensions.insert(extensions.end(), instanceExtensions,
+                    instanceExtensions + instanceExtensionCount);
+
+  // TODO: verify required extensions and layers
+  // (`enumerateInstanceExtensionProperties` and
+  // `enumerateInstanceLayerProperties`)
+
+  auto applicationInfo =
+      vk::ApplicationInfo{"", 0, "", 0, vk::enumerateInstanceVersion()};
+
+  auto instance =
+      vk::createInstanceUnique({{},
+                                &applicationInfo,
+                                static_cast<uint32_t>(layers.size()),
+                                layers.data(),
+                                static_cast<uint32_t>(extensions.size()),
+                                extensions.data()});
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
