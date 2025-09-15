@@ -7,16 +7,16 @@
 #include <vulkan/vulkan.hpp>
 
 int main(int argc, char **argv) {
-  glfwInit();
+  glfwInit(); // TODO: RAII-wrap, `glfwSetErrorCallback`, not `GLFW_FALSE` check
 
-  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  GLFWwindow *window = glfwCreateWindow(512, 512, "", nullptr, nullptr);
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // TODO: set `GLFW_RESIZABLE`, `GLFW_DECORATED`, etc.
+  GLFWwindow *window = glfwCreateWindow(512, 512, "", nullptr, nullptr); // TODO: RAII-wrap
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
 
-  glfwDestroyWindow(window);
-  glfwTerminate();
+  glfwDestroyWindow(window); // TODO: RAII-wrap
+  glfwTerminate(); // TODO: RAII-wrap
   return EXIT_SUCCESS;
 }
