@@ -6,6 +6,14 @@
 #include <toml.hpp>
 #include <vulkan/vulkan.hpp>
 
+static std::vector<char> readBinaryFile(const std::filesystem::path& filepath) {
+  std::ifstream file(filepath, std::ios::binary);
+  const auto fileSize = std::filesystem::file_size(filepath);
+  std::vector<char> buffer(fileSize);
+  file.read(buffer.data(), fileSize);
+  return buffer;
+}
+
 int main(int argc, char **argv) {
   glfwInit(); // TODO: RAII-wrap, `glfwSetErrorCallback`, not `GLFW_FALSE` check
 
