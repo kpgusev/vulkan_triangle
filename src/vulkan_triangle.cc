@@ -23,14 +23,14 @@ int main(int argc, char **argv) {
       glfwCreateWindow(512, 512, "", nullptr, nullptr); // TODO: RAII-wrap
 
   // TODO: `NDEBUG` check
-  std::vector layers{"VK_LAYER_KHRONOS_validation"};
-  std::vector extensions{vk::EXTDebugUtilsExtensionName};
+  std::vector instanceLayers{"VK_LAYER_KHRONOS_validation"};
+  std::vector instanceExtensions{vk::EXTDebugUtilsExtensionName};
 
   uint32_t instanceExtensionCount = 0;
-  const char **instanceExtensions =
+  const char **glfwRequiredInstanceExtensions =
       glfwGetRequiredInstanceExtensions(&instanceExtensionCount);
-  extensions.insert(extensions.end(), instanceExtensions,
-                    instanceExtensions + instanceExtensionCount);
+  instanceExtensions.insert(instanceExtensions.end(), glfwRequiredInstanceExtensions,
+                    glfwRequiredInstanceExtensions + instanceExtensionCount);
 
   // TODO: verify required extensions and layers
   // (`vk::enumerateInstanceExtensionProperties` and
@@ -42,10 +42,10 @@ int main(int argc, char **argv) {
   auto instance =
       vk::createInstanceUnique({{},
                                 &applicationInfo,
-                                static_cast<uint32_t>(layers.size()),
-                                layers.data(),
-                                static_cast<uint32_t>(extensions.size()),
-                                extensions.data()});
+                                static_cast<uint32_t>(instanceLayers.size()),
+                                instanceLayers.data(),
+                                static_cast<uint32_t>(instanceExtensions.size()),
+                                instanceExtensions.data()});
 
   VkSurfaceKHR rawSurface;
   glfwCreateWindowSurface(*instance, window, nullptr,
@@ -58,12 +58,12 @@ int main(int argc, char **argv) {
   auto physicalDevice =
       instance->enumeratePhysicalDevices().front(); // TODO: check is suitable
 
-  auto queuePriority = 1.0f;
+  auto queuePriorities = 1.0f;
   auto deviceQueueCreateInfos = std::vector{vk::DeviceQueueCreateInfo{
       {},
       0, // TODO: `std::set` of  unique queue families indices
       1,
-      &queuePriority}};
+      &queuePriorities}};
   auto deviceExtensions = std::vector{vk::KHRSwapchainExtensionName};
   auto device = physicalDevice.createDeviceUnique(
       {{},
@@ -79,7 +79,6 @@ int main(int argc, char **argv) {
                                             vk::Format::eB8G8R8A8Unorm,
                                             vk::ColorSpaceKHR::eSrgbNonlinear};
   auto surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(*surface);
-  auto swapchainExtent = surfaceCapabilities.currentExtent;
   auto queueFamilyIndices = std::vector<uint32_t>{0}; // TODO: smart find
   auto swapchain = device->createSwapchainKHRUnique(
       {{},
@@ -87,7 +86,7 @@ int main(int argc, char **argv) {
        4, // TODO: smart set
        surfaceFormat.format,
        surfaceFormat.colorSpace,
-       swapchainExtent,
+       surfaceCapabilities.currentExtent,
        1,
        vk::ImageUsageFlagBits::eColorAttachment,
        vk::SharingMode::eExclusive, // TODO: smart set
@@ -159,11 +158,11 @@ int main(int argc, char **argv) {
           {}, vk::PrimitiveTopology::eTriangleList, vk::False};
   auto viewport = vk::Viewport{0.0f,
                                0.0f,
-                               static_cast<float>(swapchainExtent.width),
-                               static_cast<float>(swapchainExtent.height),
+                               static_cast<float>(surfaceCapabilities.currentExtent.width),
+                               static_cast<float>(surfaceCapabilities.currentExtent.height),
                                0.0f,
                                1.0f};
-  auto scissor = vk::Rect2D{{0, 0}, swapchainExtent};
+  auto scissor = vk::Rect2D{{0, 0}, surfaceCapabilities.currentExtent};
   auto pipelineViewportStateCreateInfo =
       vk::PipelineViewportStateCreateInfo{{}, 1, &viewport, 1, &scissor};
   auto rasterizer = // TODO: config
@@ -224,8 +223,8 @@ int main(int argc, char **argv) {
                                                      *renderPass,
                                                      1,
                                                      attachments,
-                                                     swapchainExtent.width,
-                                                     swapchainExtent.height,
+                                                     surfaceCapabilities.currentExtent.width,
+                                                     surfaceCapabilities.currentExtent.height,
                                                      1};
     framebuffers[i] = device->createFramebufferUnique(framebufferInfo);
   }
@@ -244,7 +243,7 @@ int main(int argc, char **argv) {
     auto renderPassBeginInfo =
         vk::RenderPassBeginInfo{*renderPass,
                                 *framebuffers[i],
-                                {{0, 0}, swapchainExtent},
+                                {{0, 0}, surfaceCapabilities.currentExtent},
                                 1,
                                 &clearColor};
     commandBuffer->beginRenderPass(renderPassBeginInfo,
