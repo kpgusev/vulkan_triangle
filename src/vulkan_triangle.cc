@@ -7,5 +7,16 @@
 #include <vulkan/vulkan.hpp>
 
 int main(int argc, char **argv) {
-	return EXIT_SUCCESS;
+  glfwInit();
+
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+  GLFWwindow *window = glfwCreateWindow(512, 512, "", nullptr, nullptr);
+
+  while (!glfwWindowShouldClose(window)) {
+    glfwPollEvents();
+  }
+
+  glfwDestroyWindow(window);
+  glfwTerminate();
+  return EXIT_SUCCESS;
 }
