@@ -78,6 +78,8 @@ int main(int argc, char **argv) {
   auto surfaceFormat = vk::SurfaceFormatKHR{// TODO: find best
                                             vk::Format::eB8G8R8A8Unorm,
                                             vk::ColorSpaceKHR::eSrgbNonlinear};
+  auto surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(*surface);
+  auto swapchainExtent = surfaceCapabilities.currentExtent;
   auto queueFamilyIndices = std::vector<uint32_t>{0}; // TODO: smart find
   auto swapchain = device->createSwapchainKHRUnique(
       {{},
@@ -85,8 +87,7 @@ int main(int argc, char **argv) {
        4, // TODO: smart set
        surfaceFormat.format,
        surfaceFormat.colorSpace,
-       physicalDevice.getSurfaceCapabilitiesKHR(*surface)
-           .currentExtent, // TODO: smart get
+       swapchainExtent,
        1,
        vk::ImageUsageFlagBits::eColorAttachment,
        vk::SharingMode::eExclusive, // TODO: smart set
@@ -159,14 +160,12 @@ int main(int argc, char **argv) {
   auto viewport = vk::Viewport{
       0.0f,
       0.0f,
-      static_cast<float>(physicalDevice.getSurfaceCapabilitiesKHR(*surface)
-                             .currentExtent.width),
-      static_cast<float>(physicalDevice.getSurfaceCapabilitiesKHR(*surface)
-                             .currentExtent.height),
+      static_cast<float>(swapchainExtent.width),
+      static_cast<float>(swapchainExtent.height),
       0.0f,
       1.0f};
   auto scissor = vk::Rect2D{
-      {0, 0}, physicalDevice.getSurfaceCapabilitiesKHR(*surface).currentExtent};
+      {0, 0}, swapchainExtent};
   auto pipelineViewportStateCreateInfo =
       vk::PipelineViewportStateCreateInfo{{}, 1, &viewport, 1, &scissor};
   auto rasterizer = // TODO: config
