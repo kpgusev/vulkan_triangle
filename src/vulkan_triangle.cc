@@ -157,15 +157,13 @@ int main(int argc, char **argv) {
   auto pipelineInputAssemblyStateCreateInfo =
       vk::PipelineInputAssemblyStateCreateInfo{
           {}, vk::PrimitiveTopology::eTriangleList, vk::False};
-  auto viewport = vk::Viewport{
-      0.0f,
-      0.0f,
-      static_cast<float>(swapchainExtent.width),
-      static_cast<float>(swapchainExtent.height),
-      0.0f,
-      1.0f};
-  auto scissor = vk::Rect2D{
-      {0, 0}, swapchainExtent};
+  auto viewport = vk::Viewport{0.0f,
+                               0.0f,
+                               static_cast<float>(swapchainExtent.width),
+                               static_cast<float>(swapchainExtent.height),
+                               0.0f,
+                               1.0f};
+  auto scissor = vk::Rect2D{{0, 0}, swapchainExtent};
   auto pipelineViewportStateCreateInfo =
       vk::PipelineViewportStateCreateInfo{{}, 1, &viewport, 1, &scissor};
   auto rasterizer = // TODO: config
@@ -200,21 +198,23 @@ int main(int argc, char **argv) {
                                             1,
                                             &pipelineColorBlendAttachmentState};
   auto pipelineLayout = device->createPipelineLayoutUnique({});
-  auto pipeline =
-    device->createGraphicsPipelineUnique(nullptr, {{},
-                                                   shaderStages,
-                                                   &pipelineVertexInputStateCreateInfo,
-                                                   &pipelineInputAssemblyStateCreateInfo,
-                                                   nullptr,
-                                                   &pipelineViewportStateCreateInfo,
-                                                   &rasterizer,
-                                                   &multisampling,
-                                                   nullptr,
-                                                   &pipelineColorBlendStateCreateInfo,
-                                                   nullptr,
-                                                   *pipelineLayout,
-                                                   *renderPass,
-                                                   0}).value;
+  auto pipeline = device
+                      ->createGraphicsPipelineUnique(
+                          nullptr, {{},
+                                    shaderStages,
+                                    &pipelineVertexInputStateCreateInfo,
+                                    &pipelineInputAssemblyStateCreateInfo,
+                                    nullptr,
+                                    &pipelineViewportStateCreateInfo,
+                                    &rasterizer,
+                                    &multisampling,
+                                    nullptr,
+                                    &pipelineColorBlendStateCreateInfo,
+                                    nullptr,
+                                    *pipelineLayout,
+                                    *renderPass,
+                                    0})
+                      .value;
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
