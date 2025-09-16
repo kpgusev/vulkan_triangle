@@ -10,7 +10,7 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 endif()
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION "${CMAKE_BINARY_DIR}")
 
-add_executable(${PROJECT_NAME} src/${PROJECT_NAME}.cc)
+add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/src/${PROJECT_NAME}.cc)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
         ${glfw3_LIBRARIES}
@@ -19,6 +19,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         ${toml11_LIBRARIES}
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE include)
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 include(CompileShaders)
