@@ -20,7 +20,8 @@ int main(int argc, char **argv) {
     throw std::runtime_error(description);
   });
 
-  glfwInit(); // TODO: RAII-wrap, not `GLFW_FALSE` check
+  if (glfwInit() == GLFW_FALSE) // TODO: RAII-wrap
+    throw std::runtime_error("Failed to initialize GLFW");
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
