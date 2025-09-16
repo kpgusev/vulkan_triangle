@@ -15,6 +15,7 @@ static std::vector<char> readBinaryFile(const std::filesystem::path &filepath) {
 }
 
 int main(int argc, char **argv) {
+  // TODO: try-catch
   glfwInit(); // TODO: RAII-wrap, `glfwSetErrorCallback`, not `GLFW_FALSE` check
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
