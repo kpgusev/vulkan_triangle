@@ -31,8 +31,9 @@ int main(int argc, char **argv) {
   uint32_t instanceExtensionCount = 0;
   const char **glfwRequiredInstanceExtensions =
       glfwGetRequiredInstanceExtensions(&instanceExtensionCount);
-  instanceExtensions.insert(instanceExtensions.end(), glfwRequiredInstanceExtensions,
-                    glfwRequiredInstanceExtensions + instanceExtensionCount);
+  instanceExtensions.insert(
+      instanceExtensions.end(), glfwRequiredInstanceExtensions,
+      glfwRequiredInstanceExtensions + instanceExtensionCount);
 
   // TODO: verify required extensions and layers
   // (`vk::enumerateInstanceExtensionProperties` and
@@ -41,13 +42,13 @@ int main(int argc, char **argv) {
   auto applicationInfo =
       vk::ApplicationInfo{"", 0, "", 0, vk::enumerateInstanceVersion()};
 
-  auto instance =
-      vk::createInstanceUnique({{},
-                                &applicationInfo,
-                                static_cast<uint32_t>(instanceLayers.size()),
-                                instanceLayers.data(),
-                                static_cast<uint32_t>(instanceExtensions.size()),
-                                instanceExtensions.data()});
+  auto instance = vk::createInstanceUnique(
+      {{},
+       &applicationInfo,
+       static_cast<uint32_t>(instanceLayers.size()),
+       instanceLayers.data(),
+       static_cast<uint32_t>(instanceExtensions.size()),
+       instanceExtensions.data()});
 
   VkSurfaceKHR rawSurface;
   glfwCreateWindowSurface(*instance, window, nullptr,
@@ -158,12 +159,13 @@ int main(int argc, char **argv) {
   auto pipelineInputAssemblyStateCreateInfo =
       vk::PipelineInputAssemblyStateCreateInfo{
           {}, vk::PrimitiveTopology::eTriangleList, vk::False};
-  auto viewport = vk::Viewport{0.0f,
-                               0.0f,
-                               static_cast<float>(surfaceCapabilities.currentExtent.width),
-                               static_cast<float>(surfaceCapabilities.currentExtent.height),
-                               0.0f,
-                               1.0f};
+  auto viewport =
+      vk::Viewport{0.0f,
+                   0.0f,
+                   static_cast<float>(surfaceCapabilities.currentExtent.width),
+                   static_cast<float>(surfaceCapabilities.currentExtent.height),
+                   0.0f,
+                   1.0f};
   auto scissor = vk::Rect2D{{0, 0}, surfaceCapabilities.currentExtent};
   auto pipelineViewportStateCreateInfo =
       vk::PipelineViewportStateCreateInfo{{}, 1, &viewport, 1, &scissor};
@@ -221,13 +223,14 @@ int main(int argc, char **argv) {
       std::vector<vk::UniqueFramebuffer>(swapchainImageViews.size());
   for (size_t i = 0; i < swapchainImageViews.size(); ++i) {
     vk::ImageView attachments[] = {*swapchainImageViews[i]};
-    auto framebufferInfo = vk::FramebufferCreateInfo{{},
-                                                     *renderPass,
-                                                     1,
-                                                     attachments,
-                                                     surfaceCapabilities.currentExtent.width,
-                                                     surfaceCapabilities.currentExtent.height,
-                                                     1};
+    auto framebufferInfo =
+        vk::FramebufferCreateInfo{{},
+                                  *renderPass,
+                                  1,
+                                  attachments,
+                                  surfaceCapabilities.currentExtent.width,
+                                  surfaceCapabilities.currentExtent.height,
+                                  1};
     framebuffers[i] = device->createFramebufferUnique(framebufferInfo);
   }
 
