@@ -290,7 +290,7 @@ int main(int argc, char **argv) {
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
     device->waitForFences({*inFlightFences[currentFrame]}, vk::True,
-                          std::numeric_limits<uint64_t>::max());
+                          std::numeric_limits<uint64_t>::max()); // TODO: add result variable
 
     uint32_t imageIndex =
         device
@@ -301,7 +301,7 @@ int main(int argc, char **argv) {
 
     if (imagesInFlight[imageIndex] != nullptr) {
       device->waitForFences({imagesInFlight[imageIndex]}, vk::True,
-                            std::numeric_limits<uint64_t>::max());
+                            std::numeric_limits<uint64_t>::max()); // TODO: add result variable
     }
     imagesInFlight[imageIndex] = *inFlightFences[currentFrame];
 
@@ -322,7 +322,7 @@ int main(int argc, char **argv) {
 
     vk::SwapchainKHR swapchains[] = {*swapchain};
     presentQueue.presentKHR({1, &(*renderFinishedSemaphores[imageIndex]), 1,
-                             swapchains, &imageIndex});
+                             swapchains, &imageIndex}); // TODO: add result variable
 
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
   }
