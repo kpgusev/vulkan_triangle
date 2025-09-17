@@ -17,8 +17,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         ${Vulkan_LIBRARIES}
         ${glm_LIBRARIES}
         ${toml11_LIBRARIES}
+        ${ZLIB_LIBRARIES}
+        ${PNG_LIBRARIES}
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/external)
 
 include(CompileShaders)

@@ -1,10 +1,32 @@
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
-#include <toml.hpp>
+#include <png.h>
 #include <vulkan/vulkan.hpp>
+
+// TODO: RAII-wraps, exceptions, error handling
+void savePNG(const char *filename, const int width, const int height,
+             const void *buffer) {
+  FILE *fp = fopen(filename, "wb");
+  png_structp png_ptr =
+      png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+  png_infop info_ptr = png_create_info_struct(png_ptr);
+  png_init_io(png_ptr, fp);
+  png_set_IHDR(png_ptr, info_ptr, width, height, 8, PNG_COLOR_TYPE_RGBA,
+               PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
+               PNG_FILTER_TYPE_DEFAULT);
+  png_write_info(png_ptr, info_ptr);
+  std::vector<png_bytep> row_pointers(height);
+  int stride = width * 4;
+  for (int y = 0; y < height; ++y) {
+    row_pointers[y] = (png_bytep)buffer + y * stride;
+  }
+  png_write_image(png_ptr, row_pointers.data());
+  png_write_end(png_ptr, NULL);
+  png_destroy_write_struct(&png_ptr, &info_ptr);
+  fclose(fp);
+}
 
 static std::vector<char> readBinaryFile(const std::filesystem::path &filepath) {
   std::ifstream file(filepath, std::ios::binary);
@@ -14,31 +36,29 @@ static std::vector<char> readBinaryFile(const std::filesystem::path &filepath) {
   return buffer;
 }
 
+uint32_t findMemoryType(const vk::PhysicalDevice &physicalDevice,
+                        const uint32_t &typeFilter,
+                        const vk::MemoryPropertyFlags &properties) {
+  auto memoryProperties = physicalDevice.getMemoryProperties();
+
+  for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
+    if ((typeFilter & (1 << i)) &&
+        (memoryProperties.memoryTypes[i].propertyFlags & properties) ==
+            properties)
+      return i;
+  }
+
+  throw std::runtime_error("Failed to find suitable memory type!");
+}
+
 int main(int argc, char **argv) {
-  // TODO: try-catch
-  glfwSetErrorCallback([](int, const char *description) {
-    throw std::runtime_error(description);
-  });
-
-  if (glfwInit() == GLFW_FALSE) // TODO: RAII-wrap
-    throw std::runtime_error("Failed to initialize GLFW");
-
-  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
-  auto window =
-      glfwCreateWindow(512, 512, "", nullptr, nullptr); // TODO: RAII-wrap
+  const auto WIDTH = static_cast<uint32_t>(2048);
+  const auto HEIGHT = WIDTH;
+  const auto IMAGE_FORMAT = vk::Format::eR8G8B8A8Unorm;
 
   // TODO: `NDEBUG` check
   std::vector instanceLayers{"VK_LAYER_KHRONOS_validation"};
   std::vector instanceExtensions{vk::EXTDebugUtilsExtensionName};
-
-  uint32_t instanceExtensionCount = 0;
-  const char **glfwRequiredInstanceExtensions =
-      glfwGetRequiredInstanceExtensions(&instanceExtensionCount);
-  instanceExtensions.insert(
-      instanceExtensions.end(), glfwRequiredInstanceExtensions,
-      glfwRequiredInstanceExtensions + instanceExtensionCount);
 
   // TODO: verify required extensions and layers
   // (`vk::enumerateInstanceExtensionProperties` and
@@ -55,14 +75,6 @@ int main(int argc, char **argv) {
        static_cast<uint32_t>(instanceExtensions.size()),
        instanceExtensions.data()});
 
-  VkSurfaceKHR rawSurface;
-  glfwCreateWindowSurface(*instance, window, nullptr,
-                          &rawSurface); // TODO: check `vk::Result::eSuccess`
-  auto surface = vk::UniqueSurfaceKHR{
-      rawSurface,
-      vk::detail::ObjectDestroy<vk::Instance, vk::detail::DispatchLoaderStatic>{
-          *instance}};
-
   auto physicalDevice =
       instance->enumeratePhysicalDevices().front(); // TODO: check is suitable
 
@@ -72,63 +84,75 @@ int main(int argc, char **argv) {
       0, // TODO: `std::set` of  unique queue families indices
       1,
       &queuePriorities}};
-  auto deviceExtensions = std::vector{vk::KHRSwapchainExtensionName};
   auto device = physicalDevice.createDeviceUnique(
       {{},
        static_cast<uint32_t>(deviceQueueCreateInfos.size()),
        deviceQueueCreateInfos.data(),
        0,
        nullptr,
-       static_cast<uint32_t>(deviceExtensions.size()),
-       deviceExtensions.data(),
+       0,
+       nullptr,
        nullptr});
 
-  auto surfaceFormat = vk::SurfaceFormatKHR{// TODO: find best
-                                            vk::Format::eB8G8R8A8Unorm,
-                                            vk::ColorSpaceKHR::eSrgbNonlinear};
-  auto surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(*surface);
-  auto queueFamilyIndices = std::vector<uint32_t>{0}; // TODO: smart find
-  auto swapchain = device->createSwapchainKHRUnique(
+  auto colorImage =
+      device->createImageUnique({{},
+                                 vk::ImageType::e2D,
+                                 IMAGE_FORMAT,
+                                 {WIDTH, HEIGHT, 1},
+                                 1,
+                                 1,
+                                 vk::SampleCountFlagBits::e1,
+                                 vk::ImageTiling::eOptimal,
+                                 vk::ImageUsageFlagBits::eColorAttachment |
+                                     vk::ImageUsageFlagBits::eTransferSrc,
+                                 vk::SharingMode::eExclusive,
+                                 {},
+                                 vk::ImageLayout::eUndefined});
+
+  auto imageMemoryRequirements =
+      device->getImageMemoryRequirements(*colorImage);
+  auto memoryAllocateInfo = vk::MemoryAllocateInfo{
+      imageMemoryRequirements.size,
+      findMemoryType(physicalDevice, imageMemoryRequirements.memoryTypeBits,
+                     vk::MemoryPropertyFlagBits::eDeviceLocal)};
+  auto colorImageMemory = device->allocateMemoryUnique(memoryAllocateInfo);
+  device->bindImageMemory(*colorImage, *colorImageMemory, 0);
+
+  auto colorImageView = device->createImageViewUnique(
       {{},
-       *surface,
-       4, // TODO: smart set
-       surfaceFormat.format,
-       surfaceFormat.colorSpace,
-       surfaceCapabilities.currentExtent,
-       1,
-       vk::ImageUsageFlagBits::eColorAttachment,
-       vk::SharingMode::eExclusive, // TODO: smart set
-       static_cast<uint32_t>(queueFamilyIndices.size()),
-       queueFamilyIndices.data(),
-       physicalDevice.getSurfaceCapabilitiesKHR(*surface).currentTransform,
-       vk::CompositeAlphaFlagBitsKHR::eOpaque,
-       vk::PresentModeKHR::eMailbox, // TODO: find best
-       vk::True,
-       nullptr});
+       *colorImage,
+       vk::ImageViewType::e2D,
+       IMAGE_FORMAT,
+       {},
+       {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
 
-  auto swapchainImages = device->getSwapchainImagesKHR(*swapchain);
-  auto swapchainImageViews =
-      std::vector<vk::UniqueImageView>(swapchainImages.size());
-  for (size_t i = 0; i < swapchainImages.size(); ++i) {
-    swapchainImageViews[i] = device->createImageViewUnique(
-        {{},
-         swapchainImages[i],
-         vk::ImageViewType::e2D,
-         surfaceFormat.format,
-         {},
-         {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}});
-  }
+  auto bufferSize = vk::DeviceSize{WIDTH * HEIGHT * 4};
+  auto stagingBufferCreateInfo =
+      vk::BufferCreateInfo{{},
+                           bufferSize,
+                           vk::BufferUsageFlagBits::eTransferDst,
+                           vk::SharingMode::eExclusive};
+  auto stagingBuffer = device->createBufferUnique(stagingBufferCreateInfo);
+  auto bufferMemoryRequirements =
+      device->getBufferMemoryRequirements(*stagingBuffer);
+  memoryAllocateInfo = vk::MemoryAllocateInfo{
+      bufferMemoryRequirements.size,
+      findMemoryType(physicalDevice, bufferMemoryRequirements.memoryTypeBits,
+                     vk::MemoryPropertyFlagBits::eHostVisible |
+                         vk::MemoryPropertyFlagBits::eHostCoherent)};
+  auto stagingBufferMemory = device->allocateMemoryUnique(memoryAllocateInfo);
+  device->bindBufferMemory(*stagingBuffer, *stagingBufferMemory, 0);
 
   auto colorAttachment =
       vk::AttachmentDescription{{},
-                                surfaceFormat.format,
+                                IMAGE_FORMAT,
                                 vk::SampleCountFlagBits::e1,
                                 vk::AttachmentLoadOp::eClear,
                                 vk::AttachmentStoreOp::eStore,
                                 vk::AttachmentLoadOp::eDontCare,
                                 vk::AttachmentStoreOp::eDontCare,
                                 vk::ImageLayout::eUndefined,
-                                vk::ImageLayout::ePresentSrcKHR};
+                                vk::ImageLayout::eTransferSrcOptimal};
   auto colorAttachmentReference =
       vk::AttachmentReference{0, vk::ImageLayout::eColorAttachmentOptimal};
 
@@ -164,14 +188,10 @@ int main(int argc, char **argv) {
   auto pipelineInputAssemblyStateCreateInfo =
       vk::PipelineInputAssemblyStateCreateInfo{
           {}, vk::PrimitiveTopology::eTriangleList, vk::False};
-  auto viewport =
-      vk::Viewport{0.0f,
-                   0.0f,
-                   static_cast<float>(surfaceCapabilities.currentExtent.width),
-                   static_cast<float>(surfaceCapabilities.currentExtent.height),
-                   0.0f,
-                   1.0f};
-  auto scissor = vk::Rect2D{{0, 0}, surfaceCapabilities.currentExtent};
+  auto viewport = vk::Viewport{
+      0.0f, 0.0f, static_cast<float>(WIDTH), static_cast<float>(HEIGHT),
+      0.0f, 1.0f};
+  auto scissor = vk::Rect2D{{0, 0}, {WIDTH, HEIGHT}};
   auto pipelineViewportStateCreateInfo =
       vk::PipelineViewportStateCreateInfo{{}, 1, &viewport, 1, &scissor};
   auto rasterizer = // TODO: config
@@ -224,112 +244,46 @@ int main(int argc, char **argv) {
                                     0})
                       .value;
 
-  auto framebuffers =
-      std::vector<vk::UniqueFramebuffer>(swapchainImageViews.size());
-  for (size_t i = 0; i < swapchainImageViews.size(); ++i) {
-    vk::ImageView attachments[] = {*swapchainImageViews[i]};
-    auto framebufferInfo =
-        vk::FramebufferCreateInfo{{},
-                                  *renderPass,
-                                  1,
-                                  attachments,
-                                  surfaceCapabilities.currentExtent.width,
-                                  surfaceCapabilities.currentExtent.height,
-                                  1};
-    framebuffers[i] = device->createFramebufferUnique(framebufferInfo);
-  }
+  auto attachments = std::vector{vk::ImageView{*colorImageView}};
+  auto framebufferInfo = vk::FramebufferCreateInfo{
+      {}, *renderPass, 1, attachments.data(), WIDTH, HEIGHT, 1};
+  auto framebuffer = device->createFramebufferUnique(framebufferInfo);
 
   auto commandPool = device->createCommandPoolUnique(
       {vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
        0}); // TODO: smart queue family index
-  auto commandBuffers = device->allocateCommandBuffersUnique(
-      {*commandPool, vk::CommandBufferLevel::ePrimary,
-       static_cast<uint32_t>(framebuffers.size())});
+  auto commandBuffer = std::move(device->allocateCommandBuffersUnique(
+      {*commandPool, vk::CommandBufferLevel::ePrimary, 1})[0]);
 
-  for (size_t i = 0; i < commandBuffers.size(); ++i) {
-    auto &commandBuffer = commandBuffers[i];
-    commandBuffer->begin({vk::CommandBufferUsageFlagBits::eSimultaneousUse});
-    vk::ClearValue clearColor{std::array{0.0f, 0.0f, 0.0f, 1.0f}};
-    auto renderPassBeginInfo =
-        vk::RenderPassBeginInfo{*renderPass,
-                                *framebuffers[i],
-                                {{0, 0}, surfaceCapabilities.currentExtent},
-                                1,
-                                &clearColor};
-    commandBuffer->beginRenderPass(renderPassBeginInfo,
-                                   vk::SubpassContents::eInline);
-    commandBuffer->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
-    commandBuffer->draw(3, 1, 0, 0);
-    commandBuffer->endRenderPass();
-    commandBuffer->end();
-  }
+  commandBuffer->begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
 
-  auto MAX_FRAMES_IN_FLIGHT = 2;
-
-  auto imageAvailableSemaphores =
-      std::vector<vk::UniqueSemaphore>(MAX_FRAMES_IN_FLIGHT);
-  auto inFlightFences = std::vector<vk::UniqueFence>(MAX_FRAMES_IN_FLIGHT);
-  for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-    imageAvailableSemaphores[i] = device->createSemaphoreUnique({});
-    inFlightFences[i] =
-        device->createFenceUnique({vk::FenceCreateFlagBits::eSignaled});
-  }
-
-  auto renderFinishedSemaphores =
-      std::vector<vk::UniqueSemaphore>(swapchainImages.size());
-  for (size_t i = 0; i < swapchainImages.size(); ++i) {
-    renderFinishedSemaphores[i] = device->createSemaphoreUnique({});
-  }
-
-  auto imagesInFlight = std::vector<vk::Fence>(swapchainImages.size(), nullptr);
+  auto clearColor = vk::ClearValue{std::array{0.0f, 0.0f, 0.0f, 1.0f}};
+  auto renderPassBeginInfo = vk::RenderPassBeginInfo{
+      *renderPass, *framebuffer, {{0, 0}, {WIDTH, HEIGHT}}, 1, &clearColor};
+  commandBuffer->beginRenderPass(renderPassBeginInfo,
+                                 vk::SubpassContents::eInline);
+  commandBuffer->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
+  commandBuffer->draw(3, 1, 0, 0);
+  commandBuffer->endRenderPass();
+  auto copyRegion =
+      vk::BufferImageCopy{0,         0,
+                          0,         {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
+                          {0, 0, 0}, {WIDTH, HEIGHT, 1}};
+  commandBuffer->copyImageToBuffer(*colorImage,
+                                   vk::ImageLayout::eTransferSrcOptimal,
+                                   *stagingBuffer, {copyRegion});
+  commandBuffer->end();
 
   auto graphicsQueue = device->getQueue(0, 0);
-  auto presentQueue = device->getQueue(0, 0);
-
-  auto currentFrame = static_cast<size_t>(0);
-  while (!glfwWindowShouldClose(window)) {
-    glfwPollEvents();
-    device->waitForFences({*inFlightFences[currentFrame]}, vk::True,
-                          std::numeric_limits<uint64_t>::max()); // TODO: add result variable
-
-    uint32_t imageIndex =
-        device
-            ->acquireNextImageKHR(
-                *swapchain, std::numeric_limits<uint64_t>::max(),
-                *imageAvailableSemaphores[currentFrame], nullptr)
-            .value;
-
-    if (imagesInFlight[imageIndex] != nullptr) {
-      device->waitForFences({imagesInFlight[imageIndex]}, vk::True,
-                            std::numeric_limits<uint64_t>::max()); // TODO: add result variable
-    }
-    imagesInFlight[imageIndex] = *inFlightFences[currentFrame];
-
-    device->resetFences({*inFlightFences[currentFrame]});
-
-    vk::Semaphore waitSemaphores[] = {*imageAvailableSemaphores[currentFrame]};
-    vk::PipelineStageFlags waitStages[] = {
-        vk::PipelineStageFlagBits::eColorAttachmentOutput};
-
-    auto submitInfo = vk::SubmitInfo{1,
-                                     waitSemaphores,
-                                     waitStages,
-                                     1,
-                                     &(*commandBuffers[imageIndex]),
-                                     1,
-                                     &(*renderFinishedSemaphores[imageIndex])};
-    graphicsQueue.submit({submitInfo}, *inFlightFences[currentFrame]);
-
-    vk::SwapchainKHR swapchains[] = {*swapchain};
-    presentQueue.presentKHR({1, &(*renderFinishedSemaphores[imageIndex]), 1,
-                             swapchains, &imageIndex}); // TODO: add result variable
-
-    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-  }
-
+  auto submitInfo = vk::SubmitInfo{0, nullptr, nullptr, 1, &(*commandBuffer)};
+  graphicsQueue.submit({submitInfo}, nullptr);
   device->waitIdle();
 
-  glfwDestroyWindow(window); // TODO: RAII-wrap
-  glfwTerminate();           // TODO: RAII-wrap
+  void *mappedMemory =
+      device->mapMemory(*stagingBufferMemory, 0, bufferSize, {});
+
+  savePNG("result.png", WIDTH, HEIGHT, mappedMemory);
+
+  device->unmapMemory(*stagingBufferMemory);
   return EXIT_SUCCESS;
 }
