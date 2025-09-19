@@ -6,6 +6,96 @@
 #include <toml.hpp>
 #include <vulkan/vulkan.hpp>
 
+class WindowManager {
+public:
+  WindowManager(WindowManager &) = delete;
+  WindowManager &operator=(WindowManager &) = delete;
+  WindowManager(WindowManager &&) = delete;
+  WindowManager &operator=(WindowManager &&) = delete;
+
+  static WindowManager &instance();
+
+  GLFWwindow *createWindow(int width, int height, const char *title) const;
+  void destroyWindow(GLFWwindow *window) const;
+  void
+  insertRequiredInstanceExtensions(std::vector<const char *> &extensions) const;
+  void setParameter(int parameter, int value) const;
+
+private:
+  WindowManager();
+  ~WindowManager();
+};
+
+WindowManager::WindowManager() {
+  glfwSetErrorCallback([](int, const char *description) {
+    throw std::runtime_error(description); // TODO: custom exceptions
+  });
+
+  if (!glfwInit())
+    throw std::runtime_error("Failed to initialize GLFW");
+  setParameter(GLFW_CLIENT_API, GLFW_NO_API);
+}
+
+WindowManager::~WindowManager() { glfwTerminate(); }
+
+WindowManager &WindowManager::instance() {
+  static WindowManager windowManager;
+  return windowManager;
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+GLFWwindow *WindowManager::createWindow(const int width, const int height,
+                                        const char *title) const {
+  return glfwCreateWindow(width, height, title, nullptr, nullptr);
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+void WindowManager::destroyWindow(GLFWwindow *window) const {
+  glfwDestroyWindow(window);
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+void WindowManager::insertRequiredInstanceExtensions(
+    std::vector<const char *> &extensions) const {
+  uint32_t instanceExtensionCount = 0;
+  const char **instanceExtensions =
+      glfwGetRequiredInstanceExtensions(&instanceExtensionCount);
+  extensions.insert(extensions.end(), instanceExtensions,
+                    instanceExtensions + instanceExtensionCount);
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+void WindowManager::setParameter(const int parameter, const int value) const {
+  glfwWindowHint(parameter, value);
+}
+
+class Window {
+public:
+  Window(int width, int height, const char *title);
+  ~Window();
+
+  // TODO: copy- & move- constructor & operator implementation
+  Window(const Window &) = delete;
+  Window &operator=(Window &) = delete;
+  Window(const Window &&) = delete;
+  Window &operator=(const Window &&) = delete;
+
+  [[nodiscard]] GLFWwindow *get() const;
+  GLFWwindow *operator*() const;
+
+private:
+  GLFWwindow *window;
+};
+
+Window::Window(const int width, const int height, const char *title)
+    : window(WindowManager::instance().createWindow(width, height, title)) {}
+
+Window::~Window() { WindowManager::instance().destroyWindow(window); }
+
+GLFWwindow *Window::get() const { return window; }
+
+GLFWwindow *Window::operator*() const { return get(); }
+
 static std::vector<char> readBinaryFile(const std::filesystem::path &filepath) {
   std::ifstream file(filepath, std::ios::binary);
   const auto fileSize = std::filesystem::file_size(filepath);
@@ -16,18 +106,9 @@ static std::vector<char> readBinaryFile(const std::filesystem::path &filepath) {
 
 int main(int argc, char **argv) {
   // TODO: try-catch
-  glfwSetErrorCallback([](int, const char *description) {
-    throw std::runtime_error(description);
-  });
-
-  if (glfwInit() == GLFW_FALSE) // TODO: RAII-wrap
-    throw std::runtime_error("Failed to initialize GLFW");
-
-  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
-  auto window =
-      glfwCreateWindow(512, 512, "", nullptr, nullptr); // TODO: RAII-wrap
+  WindowManager::instance().setParameter(GLFW_RESIZABLE, GLFW_FALSE);
+  WindowManager::instance().setParameter(GLFW_DECORATED, GLFW_FALSE);
+  auto window = Window(512, 512, "");
 
   // TODO: `NDEBUG` check
   std::vector instanceLayers{"VK_LAYER_KHRONOS_validation"};
@@ -56,7 +137,7 @@ int main(int argc, char **argv) {
        instanceExtensions.data()});
 
   VkSurfaceKHR rawSurface;
-  glfwCreateWindowSurface(*instance, window, nullptr,
+  glfwCreateWindowSurface(*instance, *window, nullptr,
                           &rawSurface); // TODO: check `vk::Result::eSuccess`
   auto surface = vk::UniqueSurfaceKHR{
       rawSurface,
@@ -287,7 +368,7 @@ int main(int argc, char **argv) {
   auto presentQueue = device->getQueue(0, 0);
 
   auto currentFrame = static_cast<size_t>(0);
-  while (!glfwWindowShouldClose(window)) {
+  while (!glfwWindowShouldClose(*window)) {
     glfwPollEvents();
     device->waitForFences({*inFlightFences[currentFrame]}, vk::True,
                           std::numeric_limits<uint64_t>::max()); // TODO: add result variable
@@ -328,8 +409,5 @@ int main(int argc, char **argv) {
   }
 
   device->waitIdle();
-
-  glfwDestroyWindow(window); // TODO: RAII-wrap
-  glfwTerminate();           // TODO: RAII-wrap
   return EXIT_SUCCESS;
 }
