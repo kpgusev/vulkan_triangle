@@ -1,130 +1,13 @@
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
-#include <toml.hpp>
 #include <vulkan/vulkan.hpp>
 
-class WindowManager {
-public:
-  WindowManager(WindowManager &) = delete;
-  WindowManager &operator=(WindowManager &) = delete;
-  WindowManager(WindowManager &&) = delete;
-  WindowManager &operator=(WindowManager &&) = delete;
-
-  static WindowManager &instance();
-
-  GLFWwindow *createWindow(int width, int height, const char *title) const;
-  void destroyWindow(GLFWwindow *window) const;
-  void
-  insertRequiredInstanceExtensions(std::vector<const char *> &extensions) const;
-  void setParameter(int parameter, int value) const;
-  VkSurfaceKHR createSurface(const vk::Instance &instance,
-                             GLFWwindow *window) const;
-  void pollEvents() const;
-
-  bool windowShouldClose(GLFWwindow *window) const;
-
-private:
-  WindowManager();
-  ~WindowManager();
-};
-
-WindowManager::WindowManager() {
-  glfwSetErrorCallback([](int, const char *description) {
-    throw std::runtime_error(description); // TODO: custom exceptions
-  });
-
-  if (!glfwInit())
-    throw std::runtime_error("Failed to initialize GLFW");
-  setParameter(GLFW_CLIENT_API, GLFW_NO_API);
-}
-
-WindowManager::~WindowManager() { glfwTerminate(); }
-
-WindowManager &WindowManager::instance() {
-  static WindowManager windowManager;
-  return windowManager;
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-GLFWwindow *WindowManager::createWindow(const int width, const int height,
-                                        const char *title) const {
-  return glfwCreateWindow(width, height, title, nullptr, nullptr);
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-void WindowManager::destroyWindow(GLFWwindow *window) const {
-  glfwDestroyWindow(window);
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-void WindowManager::insertRequiredInstanceExtensions(
-    std::vector<const char *> &extensions) const {
-  uint32_t instanceExtensionCount = 0;
-  const char **instanceExtensions =
-      glfwGetRequiredInstanceExtensions(&instanceExtensionCount);
-  extensions.insert(extensions.end(), instanceExtensions,
-                    instanceExtensions + instanceExtensionCount);
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-void WindowManager::setParameter(const int parameter, const int value) const {
-  glfwWindowHint(parameter, value);
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-VkSurfaceKHR WindowManager::createSurface(const vk::Instance &instance,
-                                          GLFWwindow *window) const {
-  VkSurfaceKHR surface;
-  if (glfwCreateWindowSurface(instance, window, nullptr, &surface) !=
-      VK_SUCCESS)
-    throw std::runtime_error(
-        "Failed to create window surface"); // TODO: custom exceptions
-  return surface;
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-bool WindowManager::windowShouldClose(GLFWwindow *window) const {
-  return glfwWindowShouldClose(window);
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-void WindowManager::pollEvents() const { glfwPollEvents(); }
-
-class Window {
-public:
-  Window(int width, int height, const char *title);
-  ~Window();
-
-  // TODO: copy- & move- constructor & operator implementation
-  Window(const Window &) = delete;
-  Window &operator=(Window &) = delete;
-  Window(const Window &&) = delete;
-  Window &operator=(const Window &&) = delete;
-
-  [[nodiscard]] GLFWwindow *get() const;
-  GLFWwindow *operator*() const;
-
-  bool shouldClose() const;
-
-private:
-  GLFWwindow *window;
-};
-
-Window::Window(const int width, const int height, const char *title)
-    : window(WindowManager::instance().createWindow(width, height, title)) {}
-
-Window::~Window() { WindowManager::instance().destroyWindow(window); }
-
-GLFWwindow *Window::get() const { return window; }
-
-GLFWwindow *Window::operator*() const { return get(); }
-
-bool Window::shouldClose() const {
-  return WindowManager::instance().windowShouldClose(window);
-}
+#include "Window.hh"
+#include "WindowManager.hh"
 
 static std::vector<char> readBinaryFile(const std::filesystem::path &filepath) {
   std::ifstream file(filepath, std::ios::binary);

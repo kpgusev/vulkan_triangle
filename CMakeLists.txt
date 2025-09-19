@@ -10,7 +10,13 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 endif()
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/assets" DESTINATION "${CMAKE_BINARY_DIR}")
 
-add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/src/${PROJECT_NAME}.cc)
+set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+add_executable(${PROJECT_NAME}
+        ${SOURCE_DIR}/${PROJECT_NAME}.cc
+        ${SOURCE_DIR}/WindowManager.cc
+        ${SOURCE_DIR}/Window.cc
+)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
         ${glfw3_LIBRARIES}
