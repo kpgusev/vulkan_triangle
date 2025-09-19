@@ -20,6 +20,11 @@ public:
   void
   insertRequiredInstanceExtensions(std::vector<const char *> &extensions) const;
   void setParameter(int parameter, int value) const;
+  VkSurfaceKHR createSurface(const vk::Instance &instance,
+                             GLFWwindow *window) const;
+  void pollEvents() const;
+
+  bool windowShouldClose(GLFWwindow *window) const;
 
 private:
   WindowManager();
@@ -69,6 +74,25 @@ void WindowManager::setParameter(const int parameter, const int value) const {
   glfwWindowHint(parameter, value);
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+VkSurfaceKHR WindowManager::createSurface(const vk::Instance &instance,
+                                          GLFWwindow *window) const {
+  VkSurfaceKHR surface;
+  if (glfwCreateWindowSurface(instance, window, nullptr, &surface) !=
+      VK_SUCCESS)
+    throw std::runtime_error(
+        "Failed to create window surface"); // TODO: custom exceptions
+  return surface;
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+bool WindowManager::windowShouldClose(GLFWwindow *window) const {
+  return glfwWindowShouldClose(window);
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+void WindowManager::pollEvents() const { glfwPollEvents(); }
+
 class Window {
 public:
   Window(int width, int height, const char *title);
@@ -83,6 +107,8 @@ public:
   [[nodiscard]] GLFWwindow *get() const;
   GLFWwindow *operator*() const;
 
+  bool shouldClose() const;
+
 private:
   GLFWwindow *window;
 };
@@ -95,6 +121,10 @@ Window::~Window() { WindowManager::instance().destroyWindow(window); }
 GLFWwindow *Window::get() const { return window; }
 
 GLFWwindow *Window::operator*() const { return get(); }
+
+bool Window::shouldClose() const {
+  return WindowManager::instance().windowShouldClose(window);
+}
 
 static std::vector<char> readBinaryFile(const std::filesystem::path &filepath) {
   std::ifstream file(filepath, std::ios::binary);
@@ -114,12 +144,8 @@ int main(int argc, char **argv) {
   std::vector instanceLayers{"VK_LAYER_KHRONOS_validation"};
   std::vector instanceExtensions{vk::EXTDebugUtilsExtensionName};
 
-  uint32_t instanceExtensionCount = 0;
-  const char **glfwRequiredInstanceExtensions =
-      glfwGetRequiredInstanceExtensions(&instanceExtensionCount);
-  instanceExtensions.insert(
-      instanceExtensions.end(), glfwRequiredInstanceExtensions,
-      glfwRequiredInstanceExtensions + instanceExtensionCount);
+  WindowManager::instance().insertRequiredInstanceExtensions(
+      instanceExtensions);
 
   // TODO: verify required extensions and layers
   // (`vk::enumerateInstanceExtensionProperties` and
@@ -136,11 +162,8 @@ int main(int argc, char **argv) {
        static_cast<uint32_t>(instanceExtensions.size()),
        instanceExtensions.data()});
 
-  VkSurfaceKHR rawSurface;
-  glfwCreateWindowSurface(*instance, *window, nullptr,
-                          &rawSurface); // TODO: check `vk::Result::eSuccess`
   auto surface = vk::UniqueSurfaceKHR{
-      rawSurface,
+      WindowManager::instance().createSurface(*instance, *window),
       vk::detail::ObjectDestroy<vk::Instance, vk::detail::DispatchLoaderStatic>{
           *instance}};
 
@@ -368,10 +391,11 @@ int main(int argc, char **argv) {
   auto presentQueue = device->getQueue(0, 0);
 
   auto currentFrame = static_cast<size_t>(0);
-  while (!glfwWindowShouldClose(*window)) {
-    glfwPollEvents();
-    device->waitForFences({*inFlightFences[currentFrame]}, vk::True,
-                          std::numeric_limits<uint64_t>::max()); // TODO: add result variable
+  while (!window.shouldClose()) {
+    WindowManager::instance().pollEvents();
+    device->waitForFences(
+        {*inFlightFences[currentFrame]}, vk::True,
+        std::numeric_limits<uint64_t>::max()); // TODO: add result variable
 
     uint32_t imageIndex =
         device
@@ -381,8 +405,9 @@ int main(int argc, char **argv) {
             .value;
 
     if (imagesInFlight[imageIndex] != nullptr) {
-      device->waitForFences({imagesInFlight[imageIndex]}, vk::True,
-                            std::numeric_limits<uint64_t>::max()); // TODO: add result variable
+      device->waitForFences(
+          {imagesInFlight[imageIndex]}, vk::True,
+          std::numeric_limits<uint64_t>::max()); // TODO: add result variable
     }
     imagesInFlight[imageIndex] = *inFlightFences[currentFrame];
 
@@ -403,7 +428,8 @@ int main(int argc, char **argv) {
 
     vk::SwapchainKHR swapchains[] = {*swapchain};
     presentQueue.presentKHR({1, &(*renderFinishedSemaphores[imageIndex]), 1,
-                             swapchains, &imageIndex}); // TODO: add result variable
+                             swapchains,
+                             &imageIndex}); // TODO: add result variable
 
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
   }
