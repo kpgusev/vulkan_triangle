@@ -5,9 +5,22 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
+#define GLM_FORCE_RADIANS
+#include <glm/glm.hpp>
 
 #include "Window.hh"
 #include "WindowManager.hh"
+
+struct Vertex {
+  glm::vec2 position;
+  glm::vec3 color;
+};
+
+const std::vector<Vertex> vertices = {
+    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, {{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+    {{0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}},   {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+    {{-0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},  {{-0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+};
 
 static std::vector<char> readBinaryFile(const std::filesystem::path &filepath) {
   std::ifstream file(filepath, std::ios::binary);
@@ -125,6 +138,40 @@ int main(int argc, char **argv) {
   auto renderPass =
       device->createRenderPassUnique({{}, 1, &colorAttachment, 1, &subpass});
 
+  auto vertexBufferCreateInfo =
+      vk::BufferCreateInfo{{},
+                           sizeof(vertices.front()) * vertices.size(),
+                           vk::BufferUsageFlagBits::eVertexBuffer,
+                           vk::SharingMode::eExclusive};
+  auto vertexBuffer = device->createBufferUnique(vertexBufferCreateInfo);
+  auto vertexBufferMemoryRequirements =
+      device->getBufferMemoryRequirements(*vertexBuffer);
+  auto memoryProperties = physicalDevice.getMemoryProperties();
+
+  uint32_t memoryTypeIndex = -1;
+  for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
+    if ((vertexBufferMemoryRequirements.memoryTypeBits & (1 << i)) &&
+        (memoryProperties.memoryTypes[i].propertyFlags &
+         (vk::MemoryPropertyFlagBits::eHostVisible |
+          vk::MemoryPropertyFlagBits::eHostCoherent))) {
+      memoryTypeIndex = i;
+      break;
+    }
+  }
+
+  if (memoryTypeIndex == -1)
+    throw std::runtime_error("Failed to allocate buffer memory");
+
+  auto vertexBufferMemory = device->allocateMemoryUnique(
+      {vertexBufferMemoryRequirements.size, memoryTypeIndex});
+
+  device->bindBufferMemory(*vertexBuffer, *vertexBufferMemory, 0);
+
+  void *data = device->mapMemory(*vertexBufferMemory, 0,
+                                 vertexBufferCreateInfo.size, {});
+  memcpy(data, vertices.data(), vertexBufferCreateInfo.size);
+  device->unmapMemory(*vertexBufferMemory);
+
   // TODO: per-module load
   auto vertexShaderCode = readBinaryFile("shaders/main.vert.spv");
   auto vertexShaderModule = device->createShaderModuleUnique(
@@ -146,8 +193,23 @@ int main(int argc, char **argv) {
                                         *fragmentShaderModule,
                                         "main"}};
 
+  auto bindingDescription = vk::VertexInputBindingDescription{
+      0, sizeof(Vertex), vk::VertexInputRate::eVertex};
+
+  std::array attributeDescriptions = {
+      vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32Sfloat,
+                                          offsetof(Vertex, position)},
+      vk::VertexInputAttributeDescription{1, 0, vk::Format::eR32G32B32Sfloat,
+                                          offsetof(Vertex, color)}};
+
   auto pipelineVertexInputStateCreateInfo =
-      vk::PipelineVertexInputStateCreateInfo{};
+      vk::PipelineVertexInputStateCreateInfo{
+          {},
+          1,
+          &bindingDescription,
+          static_cast<uint32_t>(attributeDescriptions.size()),
+          attributeDescriptions.data()};
+
   auto pipelineInputAssemblyStateCreateInfo =
       vk::PipelineInputAssemblyStateCreateInfo{
           {}, vk::PrimitiveTopology::eTriangleList, vk::False};
@@ -246,7 +308,12 @@ int main(int argc, char **argv) {
     commandBuffer->beginRenderPass(renderPassBeginInfo,
                                    vk::SubpassContents::eInline);
     commandBuffer->bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
-    commandBuffer->draw(3, 1, 0, 0);
+
+    vk::Buffer vertexBuffers[] = {*vertexBuffer};
+    vk::DeviceSize offsets[] = {0};
+    commandBuffer->bindVertexBuffers(0, 1, vertexBuffers, offsets);
+
+    commandBuffer->draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
     commandBuffer->endRenderPass();
     commandBuffer->end();
   }
