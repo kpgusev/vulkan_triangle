@@ -16,11 +16,12 @@ struct Vertex {
   glm::vec3 color;
 };
 
-const std::vector<Vertex> vertices = {
-    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, {{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-    {{0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}},   {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-    {{-0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},  {{-0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-};
+const std::vector<Vertex> vertices = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+                                      {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+                                      {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+                                      {{-0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}}};
+
+const std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0};
 
 static std::vector<char> readBinaryFile(const std::filesystem::path &filepath) {
   std::ifstream file(filepath, std::ios::binary);
@@ -172,6 +173,39 @@ int main(int argc, char **argv) {
   memcpy(data, vertices.data(), vertexBufferCreateInfo.size);
   device->unmapMemory(*vertexBufferMemory);
 
+  auto indexBufferCreateInfo =
+      vk::BufferCreateInfo{{},
+                           sizeof(indices.front()) * indices.size(),
+                           vk::BufferUsageFlagBits::eIndexBuffer,
+                           vk::SharingMode::eExclusive};
+  auto indexBuffer = device->createBufferUnique(indexBufferCreateInfo);
+  auto indexBufferMemoryRequirements =
+      device->getBufferMemoryRequirements(*indexBuffer);
+
+  memoryTypeIndex = -1;
+  for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
+    if ((indexBufferMemoryRequirements.memoryTypeBits & (1 << i)) &&
+        (memoryProperties.memoryTypes[i].propertyFlags &
+         (vk::MemoryPropertyFlagBits::eHostVisible |
+          vk::MemoryPropertyFlagBits::eHostCoherent))) {
+      memoryTypeIndex = i;
+      break;
+    }
+  }
+
+  if (memoryTypeIndex == -1)
+    throw std::runtime_error("Failed to allocate buffer memory");
+
+  auto indexBufferMemory = device->allocateMemoryUnique(
+      {indexBufferMemoryRequirements.size, memoryTypeIndex});
+
+  device->bindBufferMemory(*indexBuffer, *indexBufferMemory, 0);
+
+  data =
+      device->mapMemory(*indexBufferMemory, 0, indexBufferCreateInfo.size, {});
+  memcpy(data, indices.data(), indexBufferCreateInfo.size);
+  device->unmapMemory(*indexBufferMemory);
+
   // TODO: per-module load
   auto vertexShaderCode = readBinaryFile("shaders/main.vert.spv");
   auto vertexShaderModule = device->createShaderModuleUnique(
@@ -312,8 +346,10 @@ int main(int argc, char **argv) {
     vk::Buffer vertexBuffers[] = {*vertexBuffer};
     vk::DeviceSize offsets[] = {0};
     commandBuffer->bindVertexBuffers(0, 1, vertexBuffers, offsets);
+    commandBuffer->bindIndexBuffer(*indexBuffer, 0, vk::IndexType::eUint32);
+    commandBuffer->drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0,
+                               0);
 
-    commandBuffer->draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
     commandBuffer->endRenderPass();
     commandBuffer->end();
   }
