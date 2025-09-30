@@ -1,6 +1,8 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <iostream>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -44,9 +46,27 @@ int main(int argc, char **argv) {
   WindowManager::instance().insertRequiredInstanceExtensions(
       instanceExtensions);
 
-  // TODO: verify required extensions and layers
-  // (`vk::enumerateInstanceExtensionProperties` and
-  // `vk::enumerateInstanceLayerProperties`)
+  // TODO: function for check
+  std::ranges::for_each(instanceLayers, [](const auto &layer) {
+    static auto availableLayers = vk::enumerateInstanceLayerProperties();
+    if (!std::ranges::any_of(
+            availableLayers, [&layer](const auto &availableLayer) {
+              return std::strcmp(availableLayer.layerName, layer) == 0;
+            }))
+      throw std::runtime_error(std::string{"Unsupported layer "} + layer);
+  });
+
+  std::ranges::for_each(instanceExtensions, [](const auto &extension) {
+    static auto availableExtensions =
+        vk::enumerateInstanceExtensionProperties();
+    if (!std::ranges::any_of(
+            availableExtensions, [&extension](const auto &availableExtension) {
+              return std::strcmp(availableExtension.extensionName, extension) ==
+                     0;
+            }))
+      throw std::runtime_error(std::string{"Unsupported extension "} +
+                               extension);
+  });
 
   auto applicationInfo =
       vk::ApplicationInfo{"", 0, "", 0, vk::enumerateInstanceVersion()};
@@ -70,7 +90,7 @@ int main(int argc, char **argv) {
   auto queuePriorities = 1.0f;
   auto deviceQueueCreateInfos = std::vector{vk::DeviceQueueCreateInfo{
       {},
-      0, // TODO: `std::set` of  unique queue families indices
+      0, // TODO: `std::set` of unique queue families indices
       1,
       &queuePriorities}};
   auto deviceExtensions = std::vector{vk::KHRSwapchainExtensionName};
