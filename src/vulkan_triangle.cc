@@ -403,12 +403,11 @@ int main(int argc, char **argv) {
         {*inFlightFences[currentFrame]}, vk::True,
         std::numeric_limits<uint64_t>::max()); // TODO: add result variable
 
-    uint32_t imageIndex =
-        device
-            ->acquireNextImageKHR(
-                *swapchain, std::numeric_limits<uint64_t>::max(),
-                *imageAvailableSemaphores[currentFrame], nullptr)
-            .value;
+    auto imageIndex = device
+                          ->acquireNextImageKHR(
+                              *swapchain, std::numeric_limits<uint64_t>::max(),
+                              *imageAvailableSemaphores[currentFrame], nullptr)
+                          .value;
 
     if (imagesInFlight[imageIndex] != nullptr) {
       device->waitForFences(
@@ -423,14 +422,10 @@ int main(int argc, char **argv) {
     vk::PipelineStageFlags waitStages[] = {
         vk::PipelineStageFlagBits::eColorAttachmentOutput};
 
-    auto submitInfo = vk::SubmitInfo{1,
-                                     waitSemaphores,
-                                     waitStages,
-                                     1,
-                                     &(*commandBuffers[imageIndex]),
-                                     1,
-                                     &(*renderFinishedSemaphores[imageIndex])};
-    graphicsQueue.submit({submitInfo}, *inFlightFences[currentFrame]);
+    graphicsQueue.submit(
+        {{1, waitSemaphores, waitStages, 1, &(*commandBuffers[imageIndex]), 1,
+          &(*renderFinishedSemaphores[imageIndex])}},
+        *inFlightFences[currentFrame]);
 
     vk::SwapchainKHR swapchains[] = {*swapchain};
     presentQueue.presentKHR({1, &(*renderFinishedSemaphores[imageIndex]), 1,
