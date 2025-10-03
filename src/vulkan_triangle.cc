@@ -109,13 +109,33 @@ int main(int argc, char **argv) {
                                             vk::ColorSpaceKHR::eSrgbNonlinear};
   auto surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(*surface);
   auto queueFamilyIndices = std::vector<uint32_t>{0}; // TODO: smart find
+
+  auto swapchainExtent = vk::Extent2D{};
+
+  if (surfaceCapabilities.currentExtent.width !=
+      std::numeric_limits<uint32_t>::max()) {
+    swapchainExtent = surfaceCapabilities.currentExtent;
+  } else {
+    int width, height;
+    glfwGetFramebufferSize(window.get(), &width,
+                           &height); // TODO: remove
+
+    swapchainExtent.width = std::clamp(
+        static_cast<uint32_t>(width), surfaceCapabilities.minImageExtent.width,
+        surfaceCapabilities.maxImageExtent.width);
+    swapchainExtent.height =
+        std::clamp(static_cast<uint32_t>(height),
+                   surfaceCapabilities.minImageExtent.height,
+                   surfaceCapabilities.maxImageExtent.height);
+  }
+
   auto swapchain = device->createSwapchainKHRUnique(
       {{},
        *surface,
        4, // TODO: smart set
        surfaceFormat.format,
        surfaceFormat.colorSpace,
-       surfaceCapabilities.currentExtent,
+       swapchainExtent,
        1,
        vk::ImageUsageFlagBits::eColorAttachment,
        vk::SharingMode::eExclusive, // TODO: smart set
@@ -270,11 +290,11 @@ int main(int argc, char **argv) {
   auto viewport =
       vk::Viewport{0.0f,
                    0.0f,
-                   static_cast<float>(surfaceCapabilities.currentExtent.width),
-                   static_cast<float>(surfaceCapabilities.currentExtent.height),
+                   static_cast<float>(swapchainExtent.width),
+                   static_cast<float>(swapchainExtent.height),
                    0.0f,
                    1.0f};
-  auto scissor = vk::Rect2D{{0, 0}, surfaceCapabilities.currentExtent};
+  auto scissor = vk::Rect2D{{0, 0}, swapchainExtent};
   auto pipelineViewportStateCreateInfo =
       vk::PipelineViewportStateCreateInfo{{}, 1, &viewport, 1, &scissor};
   auto rasterizer = // TODO: config
@@ -336,8 +356,8 @@ int main(int argc, char **argv) {
                                   *renderPass,
                                   1,
                                   attachments,
-                                  surfaceCapabilities.currentExtent.width,
-                                  surfaceCapabilities.currentExtent.height,
+                                  swapchainExtent.width,
+                                  swapchainExtent.height,
                                   1};
     framebuffers[i] = device->createFramebufferUnique(framebufferInfo);
   }
@@ -356,7 +376,7 @@ int main(int argc, char **argv) {
     auto renderPassBeginInfo =
         vk::RenderPassBeginInfo{*renderPass,
                                 *framebuffers[i],
-                                {{0, 0}, surfaceCapabilities.currentExtent},
+                                {{0, 0}, swapchainExtent},
                                 1,
                                 &clearColor};
     commandBuffer->beginRenderPass(renderPassBeginInfo,
